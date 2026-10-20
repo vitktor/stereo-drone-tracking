@@ -1,0 +1,13 @@
+# environments and caches
+.venv/
+__pycache__/
+.DS_Store
+
+# model weights (downloaded by ultralytics on first run; yolo11x.pt exceeds GitHub's 100 MB limit)
+*.pt
+
+# captured images and personal data
+calibration/images/
+calibration/undistorted_*.png
+test-yolo/capture_*.jpg
+data/

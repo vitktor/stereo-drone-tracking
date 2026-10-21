@@ -6,6 +6,9 @@ __pycache__/
 # model weights (downloaded by ultralytics on first run; yolo11x.pt exceeds GitHub's 100 MB limit)
 *.pt
 
+# slicer project files
+3d-models/printing/
+
 # captured images and personal data
 calibration/images/
 calibration/undistorted_*.png

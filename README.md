@@ -12,4 +12,8 @@ Each camera's CSI ribbon goes into a CSI-to-HDMI adapter, so a standard HDMI cab
 
 ## Calibrating intrinsics
 
+Each camera is calibrated on its own from 60–70 photos of a printed checkerboard, using OpenCV's rational distortion model to handle the wide-angle lens. The results are in [calibration/](calibration/): camera A reaches 0.17 px RMS reprojection error and camera B 0.26 px.
+
+![16 of the checkerboard calibration frames from camera A](calibration/checkerboards_A.jpg)
+
 ## Calibrating extrinsics

@@ -17,3 +17,11 @@ Each camera is calibrated on its own from 60–70 photos of a printed checkerboa
 ![16 of the checkerboard calibration frames from camera A](calibration/checkerboards_A.jpg)
 
 ## Calibrating extrinsics
+
+### Using a checkerboard
+
+A checkerboard on a rigid backing is moved through the area both cameras see, and 48 sharp synchronized pairs with the board fully visible in both views are kept. One row of squares is cut off the board (10×9 inner corners, 40 mm squares) so each corner gets the same number in both views. A square board can be numbered from a different corner in each camera. With each camera's intrinsics held fixed, OpenCV's stereo calibration reaches 0.43 px RMS and puts the cameras 1.96 m apart, matching the tape-measured distance.
+
+![A synchronized stereo pair with the detected checkerboard corners; matching colored rings mark the same four board corners in both views](calibration/stereo_pair.jpg)
+
+### Using the drone's LEDs

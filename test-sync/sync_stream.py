@@ -2,24 +2,30 @@ from picamera2 import Picamera2
 from libcamera import controls
 import zmq, numpy as np, time
 
-FPS, EXP_US, W, H = 30, 3000, 1280, 800
+FPS, W, H = 30, 1280, 800
+EV = -1.0   # bias AE darker so the sky doesn't clip
 
 ctx = zmq.Context()
 sock = ctx.socket(zmq.PUB)
 sock.setsockopt(zmq.SNDHWM, 4)
 sock.bind("tcp://*:5555")
 
-def setup(idx, mode):
+def setup(idx, mode, ae):
     cam = Picamera2(idx)
     cfg = cam.create_video_configuration(main={"size": (W, H), "format": "YUV420"},
                                          buffer_count=6)
     cam.configure(cfg)
-    cam.set_controls({"SyncMode": mode, "FrameRate": FPS,
-                      "AeEnable": False, "ExposureTime": EXP_US, "AnalogueGain": 1.0})
+    ctrl = {"SyncMode": mode, "FrameRate": FPS, "AeEnable": ae}
+    if ae:
+        ctrl |= {"AeExposureMode": controls.AeExposureModeEnum.Short, "ExposureValue": EV}
+    else:
+        ctrl |= {"ExposureTime": 1000, "AnalogueGain": 1.0}
+    cam.set_controls(ctrl)
     return cam
 
-c0 = setup(0, controls.rpi.SyncModeEnum.Server)
-c1 = setup(1, controls.rpi.SyncModeEnum.Client)
+# AE runs on the server only; its exposure/gain is mirrored to the client
+c0 = setup(0, controls.rpi.SyncModeEnum.Server, True)
+c1 = setup(1, controls.rpi.SyncModeEnum.Client, False)
 c1.start(); c0.start()
 
 def grab(cam):
@@ -45,5 +51,8 @@ while True:
                          np.int64(dt).tobytes(), f0.tobytes(), f1.tobytes()])
     n += 1
     if time.time() - t_last > 1:
-        print(f"{n} pairs/s, offset = {dt/1000:.1f} us")
+        c1.set_controls({"ExposureTime": m0["ExposureTime"], "AnalogueGain": m0["AnalogueGain"]})
+        print(f"{n} pairs/s, offset = {dt/1000:.1f} us, "
+              f"exp A/B = {m0['ExposureTime']}/{m1['ExposureTime']} us, "
+              f"gain A/B = {m0['AnalogueGain']:.2f}/{m1['AnalogueGain']:.2f}")
         n, t_last = 0, time.time()

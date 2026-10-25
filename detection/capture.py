@@ -10,6 +10,7 @@ One folder per session so train/val can be split by session.
 import argparse
 import re
 import time
+import tkinter
 from datetime import datetime
 from pathlib import Path
 
@@ -19,6 +20,9 @@ import zmq
 
 PI_IP, W, H = "10.42.0.2", 1280, 800
 DATA = Path(__file__).resolve().parent.parent / "data" / "drone"
+root = tkinter.Tk()
+SCREEN_W = root.winfo_screenwidth()  # in points, which is what cv2 windows use on macOS
+root.destroy()
 
 p = argparse.ArgumentParser()
 p.add_argument("--session", default=datetime.now().strftime("%Y%m%d_%H%M"), help="folder name (default: date_time)")
@@ -41,6 +45,8 @@ n = max((int(m.group(1)) + 1 for f in OUT.glob("*.png") if (m := idx.match(f.ste
 start = time.time() + args.delay if args.auto else None  # wall-clock time when the --auto countdown ends
 auto, last_save = False, 0  # sensor timestamp (ns), so auto-save spacing is exact even if frames arrive in bursts
 log = None
+cv2.namedWindow("drone capture")
+cv2.moveWindow("drone capture", 0, 0)  # left edge, so a full-width view fits on screen
 
 while True:
     msg = s.recv_multipart()
@@ -50,7 +56,8 @@ while True:
     if len(msg) == 4:  # sync_stream.py: [timestamp cam0, offset cam1-cam0, frame cam0, frame cam1]
         dt = np.frombuffer(msg[1], np.int64)[0]
         frames = [np.frombuffer(m, np.uint8).reshape(H, W) for m in msg[2:]]
-        view = cv2.resize(np.hstack(frames), None, fx=0.5, fy=0.5)
+        scale = SCREEN_W / (2 * W)  # pair fills the full screen width
+        view = cv2.resize(np.hstack(frames), None, fx=scale, fy=scale)
     else:  # pi_stream.py: [timestamp, frame]
         dt = None
         frames = [np.frombuffer(msg[1], np.uint8).reshape(H, W)]

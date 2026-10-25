@@ -38,6 +38,12 @@ When the cameras look far into the sky, a checkerboard can't be held in front of
 
 ![Synchronized stereo pairs of the flying drone; red and green circles mark its left and right LEDs in both views, with zoomed insets](calibration/drone_leds_grid.jpg)
 
+## Detecting the drone with YOLO
+
+The detector is trained on frames recorded with the rig in the room over six sessions, and labelled in CVAT. A first model, trained on a small hand-labelled set, pre-labels the remaining frames, so most of them only need their box checked. YOLO11n is fine-tuned at 640 px for 100 epochs on 1,104 images: 982 with the drone and the rest without it. On a separate session of 146 images it reaches 0.999 precision, 0.99 recall and 0.95 mAP50-95. That session shows the same room from the same viewpoint, so these numbers measure this setup, not detection in general. The scripts are in [detection/](detection/).
+
+![Six enlarged crops from the demo flight, which the model never saw in training: the drone close and far, against the bright window, on the dark curtain, near the ceiling and at the image edge, each with its detected box and confidence](detection/detections_grid.jpg)
+
 ## Reconstructing the flight in 3D
 
 Every synchronized pair is recorded at 30 fps, with no dropped frames. YOLO finds the drone in both views, and in each box the point used is the centre of the dark drone shape, which the two cameras agree on better than the box centre. A pair is triangulated only when its two points lie within 5 px of each other's epipolar lines. In the 60 s flight above, the median distance is 0.6 px, and 1,581 of the 1,801 pairs pass. A constant-velocity Kalman filter with a backward smoothing pass joins the points into one path and fills the short gaps where one camera misses the drone. The floor is placed 1 m below the cameras, using their 21° upward tilt, and the drone comes out flying at 1.3–2.5 m. The code is in [reconstruction/](reconstruction/).

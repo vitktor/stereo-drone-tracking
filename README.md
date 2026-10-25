@@ -4,7 +4,11 @@ A stereo camera rig on a Raspberry Pi 5 that detects drones in the sky in real t
 Two global-shutter OV9281-120 cameras sit on a balcony railing and send synchronized frames to the Pi.
 YOLO detects the drone in each view, and the calibrated camera pair triangulates its position in 3D.
 
-<!-- VIDEO: in the GitHub web editor, drag data/drone/reconstruction/full-n640/flight-demo/flight-demo.mp4 here and replace this comment with the link it inserts -->
+
+
+https://github.com/user-attachments/assets/569ca110-99da-4ee8-86b5-f3a4488d2f9a
+
+
 
 *A 60 s indoor flight seen by both cameras (top) and its reconstructed 3D path (bottom). The cameras stand 1 m above the floor; the path is coloured by height, and the thin lines show the two viewing rays that meet at the drone.*
 

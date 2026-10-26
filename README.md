@@ -47,3 +47,15 @@ The detector is trained on frames recorded with the rig in the room over six ses
 ## Reconstructing the flight in 3D
 
 Every synchronized pair is recorded at 30 fps, with no dropped frames. YOLO finds the drone in both views, and in each box the point used is the centre of the dark drone shape, which the two cameras agree on better than the box centre. A pair is triangulated only when its two points lie within 5 px of each other's epipolar lines. In the 60 s flight above, the median distance is 0.6 px, and 1,581 of the 1,801 pairs pass. A constant-velocity Kalman filter with a backward smoothing pass joins the points into one path and fills the short gaps where one camera misses the drone. The floor is placed 1 m below the cameras, using their 21° upward tilt, and the drone comes out flying at 1.3–2.5 m. The code is in [reconstruction/](reconstruction/).
+
+## Tracking live on the Raspberry Pi 5
+
+On the Pi, the same steps run live: the cameras keep capturing synchronized pairs at 30 fps, YOLO runs on the newest pair in both views, the drone is triangulated, and a forward-only Kalman filter tracks it. The detector's speed sets the frame rate, so three exports of the model were timed on the Pi's CPU over the same 200 frames at 640 px. All three find the drone in the same 190 frames. NCNN is clearly the fastest, and INT8 quantization barely speeds up ONNX.
+
+| Model format | ms per image | Images/s | Stereo pairs/s |
+|---|---|---|---|
+| NCNN (FP32) | 68 | 14.7 | 7.3 |
+| ONNX (FP32) | 165 | 6.1 | 3.0 |
+| ONNX (INT8) | 156 | 6.4 | 3.2 |
+
+With NCNN and the cameras capturing at the same time, the live tracker processes 5.7 pairs/s, and each position is about 210 ms old by the time it is computed. The code is in [live/](live/).

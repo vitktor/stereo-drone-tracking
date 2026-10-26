@@ -3,7 +3,7 @@
 Usage: python render.py SESSION [--run full-n640] [--start 0] [--end END] [--out FILE.mp4]
 Input: data/drone/reconstruction/<run>/<SESSION>/trajectory.csv (from triangulate_session.py), the detection boxes
 and the session frames. Output: <SESSION>.mp4 next to trajectory.csv (H.264, 1920x1320, 30 fps; needs ffmpeg).
-World frame: z up from the floor, x along the baseline from camera A to B, y into the room, metres.
+World frame (stereo.Rig.world): z up from the floor, x along the baseline from camera A to B, y into the room, metres.
 Top views and 3D path share one colour scale, the drone's height.
 """
 import argparse
@@ -19,11 +19,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
-from stereo import LABEL, Rig
+from stereo import CAM_HEIGHT, LABEL, Rig
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "drone"
-UP_A = np.array([-0.035, -0.931, 0.364])  # up in camera A's frame, from vertical room edges (A and B agree within 1 deg)
-CAM_HEIGHT = 1.0  # m, cameras above the floor (tape-measured roughly)
 VW, VH, H3 = 960, 600, 720  # each camera view, and the 3D strip below them
 TAIL, TRAIL = 3.0, 2.0  # s of bright path in 3D and of trail in the camera views
 ZMAX = 2.6  # m, top of the height colour scale
@@ -40,24 +38,7 @@ args = p.parse_args()
 DIR = DATA / "reconstruction" / args.run / args.session
 
 rig = Rig()
-up = UP_A / np.linalg.norm(UP_A)
-mid = (rig.center("A") + rig.center("B")) / 2
-ex = rig.center("B") - rig.center("A")
-ex -= (ex @ up) * up
-ex /= np.linalg.norm(ex)
-ey = np.cross(up, ex)
-TO_W = np.array([ex, ey, up])  # rows: world axes in A's frame
-
-
-def world(P):
-    """Points (N, 3) in A's frame, mm -> world, m."""
-    return (np.asarray(P) - mid) @ TO_W.T / 1000 + [0, 0, CAM_HEIGHT]
-
-
-def from_world(W):
-    """World points (N, 3), m -> A's frame, mm."""
-    return (np.asarray(W) - [0, 0, CAM_HEIGHT]) * 1000 @ TO_W + mid
-
+world, from_world = rig.world, rig.from_world
 
 rows = list(csv.DictReader(open(DIR / "trajectory.csv")))
 pairs = [r["pair"] for r in rows]

@@ -4,11 +4,8 @@ Usage: python triangulate_session.py SESSION [--run full-n640] [--max-epi 5]
 Input: data/drone/detections/<run>/<SESSION>/detections.csv (from detection/detect_session.py) and the session frames
 Output: data/drone/reconstruction/<run>/<SESSION>/: trajectory.csv (one row per recorded pair), trajectory.png
 (3D view + epipolar errors)
-The point in each view is the centroid of the dark drone blob inside the box, which the two views agree on
-better than the box centre. When the blob also takes in dark background (e.g. at a window edge) and the views no
-longer agree, the box centres are tried instead and the pair closer to the epipolar line is kept.
-Pairs still further than --max-epi px from the epipolar line, or whose box is cut by the image edge
-(only part of the drone visible), are kept in the CSV but marked bad.
+The point in each view and the checks are in stereo.Rig.locate (shared with live/track.py); pairs that fail them
+(off the epipolar line, or box cut by the image edge) are kept in the CSV but marked bad.
 The good points are then smoothed (smooth.py), which also bridges short gaps and drops points off the path.
 """
 import argparse
@@ -23,7 +20,6 @@ from smooth import smooth
 from stereo import LABEL, Rig
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "drone"
-W, H = 1280, 800
 
 p = argparse.ArgumentParser()
 p.add_argument("session")
@@ -32,20 +28,6 @@ p.add_argument("--max-epi", type=float, default=5.0, help="px from the epipolar 
 args = p.parse_args()
 OUT = DATA / "reconstruction" / args.run / args.session
 OUT.mkdir(parents=True, exist_ok=True)
-
-
-def blob_centroid(img, box, pad=4):
-    """Centroid of the largest dark region in the (slightly padded) box: the drone body and arms."""
-    x1, y1 = max(0, box[0] - pad), max(0, box[1] - pad)
-    roi = cv2.GaussianBlur(img[y1:box[3] + pad, x1:box[2] + pad], (3, 3), 0)
-    _, mask = cv2.threshold(roi, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    _, _, stats, centroids = cv2.connectedComponentsWithStats(mask)
-    return centroids[1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])] + (x1, y1)
-
-
-def at_edge(box, margin=2):
-    return box[0] <= margin or box[1] <= margin or box[2] >= W - margin or box[3] >= H - margin
-
 
 boxes = {}  # pair -> {"A": box, "B": box}
 for r in csv.DictReader(open(DATA / "detections" / args.run / args.session / "detections.csv")):
@@ -61,17 +43,8 @@ for pair, ts in stamps.items():
         rows.append(dict(pair=pair, t=ts, point="", epi=np.nan, edge=False, ok=False, X=np.full(3, np.nan),
                          pt={c: np.full(2, np.nan) for c in "AB"}))
         continue
-    pt = {c: blob_centroid(cv2.imread(str(DATA / args.session / f"{pair}_cam{i}.png"), cv2.IMREAD_GRAYSCALE), b[c])
-          for i, c in LABEL.items()}
-    epi, point = rig.epipolar_px(pt["A"][None], pt["B"][None])[0], "blob"
-    if epi > args.max_epi:
-        mid = {c: np.array([(b[c][0] + b[c][2]) / 2, (b[c][1] + b[c][3]) / 2]) for c in "AB"}
-        epi_mid = rig.epipolar_px(mid["A"][None], mid["B"][None])[0]
-        if epi_mid < epi:
-            pt, epi, point = mid, epi_mid, "box"
-    edge = at_edge(b["A"]) or at_edge(b["B"])
-    rows.append(dict(pair=pair, t=ts, point=point, epi=epi, edge=edge, ok=epi <= args.max_epi and not edge,
-                     X=rig.triangulate(pt["A"][None], pt["B"][None])[0], pt=pt))
+    img = {c: cv2.imread(str(DATA / args.session / f"{pair}_cam{i}.png"), cv2.IMREAD_GRAYSCALE) for i, c in LABEL.items()}
+    rows.append(dict(pair=pair, t=ts, **rig.locate(img, b, args.max_epi)))
 
 t = np.array([(r["t"] - rows[0]["t"]) / 1e9 for r in rows])
 both = np.array([r["point"] != "" for r in rows])
